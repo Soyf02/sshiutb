@@ -824,7 +824,7 @@ tourne sur la cible.
 \begin{questions}
 \question \textbf{Tunnel local} : depuis l'hôte, ouvrez
 \texttt{ssh -N -L 18080:127.0.0.1:8080 cible} et récupérez le service avec
-\texttt{curl 127.0.0.1:18080}. Décomposez la syntaxe \texttt{-L
+\texttt{curl 127.0.0.1:18080}. Cette commande ne rend pas la main : lancez le \texttt{curl} dans un second terminal (ou utilisez \texttt{-f} pour passer en arrière-plan). Décomposez la syntaxe \texttt{-L
 [adresse\_locale:]port\_local:hote:port} et répondez à la question capitale :
 \textbf{sur quelle machine} \texttt{hote:port} est-elle interprétée ?
 \begin{solution}
