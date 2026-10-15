@@ -1,0 +1,38 @@
+name: Signaler une commande erronée
+description: Une commande du TP est fausse, incomplète ou dangereuse telle qu'écrite.
+labels:
+  - correction-commande
+  - a-verifier-sur-terrain
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Indiquez la commande telle qu'elle est écrite dans le TP, et ce qui ne va pas.
+        Si vous pouvez, exécutez-la sur les deux VMs du TP (bastion + cible) avant de signaler.
+  - type: textarea
+    id: commande
+    attributes:
+      label: Commande concernée
+      description: Copiez la ligne exacte du TP.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: probleme
+    attributes:
+      label: Ce qui ne va pas
+      description: Ce que la commande fait réellement, ce que le TP laisse entendre.
+    validations:
+      required: true
+  - type: textarea
+    id: preuve
+    attributes:
+      label: Ce que vous avez observé
+      description: Sortie réelle, message d'erreur, comportement inattendu.
+      render: shell
+  - type: textarea
+    id: correction
+    attributes:
+      label: Correction proposée
+      description: La commande corrigée, si vous l'avez testée.
+      render: shell

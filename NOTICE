@@ -1,0 +1,34 @@
+# Notice de licence
+
+Le fichier `LICENSE` reproduit le texte canonique CC BY-SA 4.0, sans ajout, afin
+d'être reconnu automatiquement par GitHub. Les précisions ci-dessous complètent
+son application à ce dépôt.
+
+**La licence est celle retenue par l'auteur : CC BY-SA 4.0.** Elle s'applique depuis
+sa fusion sur `main` (pull request « Proposition de licence CC BY-SA 4.0 »).
+
+## Ce qui est sous CC BY-SA 4.0
+
+Le support de cours : `ssh-indep.tex` et le PDF qui en est dérivé.
+
+Copyright (c) 2026 Jean-Marc Pouchoulon <jean-marc.pouchoulon@umontpellier.fr>
+
+## Ce qui n'est PAS sous CC BY-SA 4.0
+
+`minted2.sty` est un fichier tiers sous LaTeX Project Public License (LPPL)
+version 1.3 ou supérieure, avec ses propres mentions de copyright (Geoffrey M.
+Poore, Konrad Rudolph). Voir l'en-tête de ce fichier. Embarqué dans le dépôt
+uniquement parce que cette variante Debian de `minted` n'existe ni dans TeXLive
+amont ni dans Ubuntu.
+
+## Citation attendue
+
+« TP SSH, Jean-Marc Pouchoulon, IUT Béziers, université de Montpellier », avec
+un lien vers le dépôt, et diffusion des adaptations sous la même licence.
+
+## Ce que CC BY-SA 4.0 autorise
+
+Copier, redistribuer, adapter, y compris à des fins commerciales, à deux
+conditions : citer l'auteur, et diffuser les adaptations sous une licence
+équivalente. Résumé humain (ne remplace pas le texte légal) :
+<https://creativecommons.org/licenses/by-sa/4.0/deed.fr>

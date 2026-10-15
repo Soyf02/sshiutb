@@ -1,0 +1,24 @@
+name: Demander une clarification
+description: Un passage du TP est ambigu, incompréhensible ou mal ordonné.
+labels:
+  - precision-redaction
+body:
+  - type: textarea
+    id: passage
+    attributes:
+      label: Passage concerné
+      description: Copiez la phrase ou le paragraphe, ou indiquez la section.
+    validations:
+      required: true
+  - type: textarea
+    id: difficulte
+    attributes:
+      label: Ce qui bloque
+      description: Qu'avez-vous compris, qu'avez-vous fait, où ça coince ?
+    validations:
+      required: true
+  - type: textarea
+    id: reformulation
+    attributes:
+      label: Reformulation proposée
+      description: Comment vous l'auriez écrit pour un camarade.

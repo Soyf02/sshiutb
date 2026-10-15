@@ -1,0 +1,53 @@
+name: Proposer une question
+description: Ajouter une question ou un exercice à une section du TP.
+labels:
+  - nouvelle-question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Une bonne question du TP est **vérifiable par une commande** : on doit pouvoir
+        prouver la réponse en exécutant quelque chose sur les deux VMs.
+  - type: dropdown
+    id: section
+    attributes:
+      label: Section concernée
+      options:
+        - Clés
+        - Agent
+        - ~/.ssh/config
+        - Bastion / ProxyJump
+        - Tunnels
+        - Multiplexage
+        - Débogage à distance
+        - Challenge
+        - Cheatsheet
+        - Autre ou nouvelle section
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: La question
+      description: Formulez la question telle qu'elle apparaîtrait dans le TP.
+    validations:
+      required: true
+  - type: textarea
+    id: manipulation
+    attributes:
+      label: La manipulation qui y répond
+      description: Les commandes à exécuter pour trouver la réponse.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: interet
+    attributes:
+      label: Pourquoi c'est utile
+      description: Quel piège ou quel réflexe professionnel cette question enseigne.
+  - type: textarea
+    id: reponse
+    attributes:
+      label: Réponse attendue
+      description: Ce que vous observez réellement (elle ira dans \begin{solution}).
+      render: shell

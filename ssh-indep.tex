@@ -16,18 +16,11 @@
 
 
 \frenchsetup{AutoSpacePunctuation=false}
-\usepackage{graphicx}
 
 \author{Pouchoulon}
 
 %recodage numerotation \part
 \renewcommand{\partlabel}{\thepartno}
-
-% \iconetext : une image centree verticalement.
-% L'environnement array n'existe qu'en mode mathematique : sans ensuremath,
-% tout appel a \iconetext echoue avec « ! Missing $ inserted ».
-\newcommand{\iconetext}[1]{%
-\ensuremath{\begin{array}{c}\includegraphics{#1}\end{array}}}
 
 \newcommand{\jmp}{Jean-Marc Pouchoulon}
 
@@ -361,9 +354,6 @@
 \printanswers
 \noprintanswers
 
-\graphicspath{{./images/}}
-
-
 \begin{document}
 \maketitle
 
@@ -384,8 +374,6 @@ authentification par clés, tunnels, connexions par saut, multiplexage.
   \item activer le \textbf{multiplexage} \texttt{ControlMaster} et mesurer son impact ;
   \item déboguer une connexion : \texttt{-v}, \texttt{known\_hosts}, \texttt{StrictHostKeyChecking}.
 \end{itemize}
-Vous aurer besoin de deux VMs : un bastion (exposé sur le port 2222) 
-et une cible (accessible uniquement depuis le bastion).
 
 \section{Clés : bien faire les choses dès le départ}
 
@@ -394,6 +382,9 @@ la clé publique est déposée dans \texttt{\textasciitilde/.ssh/authorized\_key
 Depuis OpenSSH 6.5 (2014), l'algorithme recommandé est \textbf{Ed25519} (RFC 8032) :
 courbes elliptiques, clé de 256~bits, aussi sûre qu'une RSA 3072, plus courte, plus rapide,
 et sans paramètre à « bien choisir » comme la taille d'une RSA.
+
+\textbf{Matériel :} vous aurez besoin de deux VMs : un \textbf{bastion} (exposé sur le
+port 2222) et une \textbf{cible} (accessible uniquement depuis le bastion).
 
 \begin{questions}
 \question Générez sur votre poste une paire de clés ed25519 avec le commentaire
@@ -580,9 +571,10 @@ ssh-add -l          # la clé a disparu de la liste, il faudra re-ssh-add
 \texttt{-t} prend une durée en secondes. Utile sur un poste partagé ou en salle de travaux
 pratiques : la clé quitte la mémoire de l'agent toute seule.
 \end{solution}
-\question Si votre poste de travail est \textbf{Windows} (client OpenSSH natif) : le service
-\texttt{ssh-agent} joue le même rôle. Quelles commandes PowerShell vérifient le service et
-chargent une clé ?
+\question Les postes de l'IUT sont sous Linux : cette question se traite \emph{sans
+machine Windows}. Si votre poste de travail avait été sous \textbf{Windows} (client
+OpenSSH natif), le service \texttt{ssh-agent} y aurait joué le même rôle. Quelles
+commandes PowerShell auriez-vous utilisées pour vérifier le service et charger une clé ?
 \begin{solution}
 \begin{bashcode}
 Get-Service ssh-agent
@@ -735,6 +727,12 @@ séparément des configs « contexte ».
 
 \section{Bastion : la connexion par saut (\texttt{ProxyJump})}
 
+\textbf{SSH Jump} (\texttt{ProxyJump}, option \texttt{-J}) permet d'accéder à un serveur
+interne en passant par un serveur de rebond, aussi appelé \textbf{bastion}. Cela évite
+d'exposer directement tous les serveurs sur le réseau externe et permet de contrôler les
+accès. Le bastion est donc le seul point d'entrée : il sécurise l'accès aux machines
+internes sans les exposer elles-mêmes.
+
 Scénario type d'entreprise : le serveur \texttt{cible} n'écoute que sur le réseau interne
 ; le \textbf{bastion} est la seule machine exposée. Objectif : \texttt{ssh cible} en une
 commande, avec la bonne clé à chaque saut, \emph{sans jamais transmettre de clé au bastion}.
@@ -750,6 +748,31 @@ n'est pas copiée, mais elle est \emph{utilisable} depuis le saut.
 (saut puis cible) ; le saut ne voit qu'un flux TCP brut qu'il transite (\texttt{-W}).
 Aucune clé ne passe sur le saut, aucune variable d'agent n'y est exposée.
 \end{solution}
+
+\question \textbf{Déployer la clé de la cible en passant par le bastion} : la cible
+n'est joignable \emph{que} depuis le bastion. Comment envoyer votre clé publique sur la
+cible avec \texttt{ssh-copy-id}, sans vous connecter manuellement sur le bastion puis de
+la cible ?
+\begin{solution}
+\texttt{ssh-copy-id} accepte les options de \texttt{ssh} via \texttt{-o}, donc le saut
+fonctionne exactement comme pour \texttt{ssh} :
+
+\begin{bashcode}
+ssh-copy-id -i ~/.ssh/id_ed25519_cible.pub -o "ProxyJump=bastion" root@10.99.0.11
+\end{bashcode}
+
+\texttt{ProxyJump=bastion} réutilise l'alias \texttt{Host bastion} du
+\texttt{\textasciitilde/.ssh/config} (\texttt{127.0.0.1:2222}). On peut aussi l'écrire en
+toutes lettres : \texttt{-o "ProxyJump=root@127.0.0.1:2222"}.
+
+Le saut ne fait que transiter un flux TCP chiffré vers \texttt{10.99.0.11:22} : la clé
+publique est déposée sur la cible, jamais sur le bastion.
+
+\textbf{Variante plus courte} : si \texttt{Host cible} contient déjà
+\texttt{ProxyJump bastion}, un simple \texttt{ssh-copy-id -i
+\textasciitilde/.ssh/id\_ed25519\_cible.pub cible} suffit.
+\end{solution}
+
 \question \textbf{Ancienne syntaxe} : connectez-vous à la cible avec
 \texttt{ssh -o "ProxyCommand=ssh bastion -W \%h:\%p" 10.99.0.11}. Qui exécute quoi sur
 le bastion ? Que fait exactement \texttt{-W hôte:port} ?
@@ -813,6 +836,68 @@ Pour \texttt{sshd} de la cible, la connexion vient de \texttt{10.99.0.10} : le b
 C'est le modèle classique de journalisation d'un bastion (le bastion doit conserver ses
 propres journaux pour rattacher « qui, depuis l'extérieur » à « quelle connexion interne »).
 \end{solution}
+\question \textbf{Bastion web avec Apache Guacamole.} Déployez Apache Guacamole sur le
+bastion avec la méthode retenue pour votre environnement. Identifiez au minimum
+l'application web, \texttt{guacd} et le mécanisme d'authentification utilisé, et consignez
+les commandes réellement exécutées. Depuis le navigateur du poste client, vérifiez que
+l'interface est accessible, puis créez dans Guacamole une connexion SSH nommée
+\texttt{cible}. Le nom configuré doit être résolu depuis le serveur Guacamole, et non
+depuis le navigateur.
+
+Vérifiez que le poste client ne peut pas ouvrir directement une session SSH vers la cible,
+mais qu'une session s'ouvre depuis l'interface Guacamole. Dans cette session, identifiez
+l'origine de la connexion vue par la cible :
+\begin{bashcode}
+ss -tn state established | grep ':22'
+journalctl -u ssh --since '5 minutes ago'
+\end{bashcode}
+
+Sur la cible, créez ensuite \texttt{/etc/ssh/banner} :
+\begin{bashcode}
+cat > /etc/ssh/banner <<'EOF'
+ATTENTION
+
+L'accès à ce système est réservé aux utilisateurs autorisés.
+Toute tentative d'accès non autorisée peut être enregistrée et faire
+l'objet de poursuites conformément à la législation applicable.
+EOF
+\end{bashcode}
+Ajoutez la directive suivante à \texttt{/etc/ssh/sshd\_config} :
+\begin{bashcode}
+Banner /etc/ssh/banner
+\end{bashcode}
+Validez la configuration avant de recharger le service Debian :
+\begin{bashcode}
+sshd -t
+systemctl reload ssh
+\end{bashcode}
+Fermez la session Guacamole, ouvrez-en une nouvelle et vérifiez que l'avertissement
+apparaît avant l'authentification.
+
+Répondez enfin aux questions suivantes : pourquoi Apache Guacamole peut-il être considéré
+comme un bastion ? Quelle machine établit réellement la connexion SSH vers la cible ?
+Quelle différence fondamentale existe entre Guacamole et \texttt{ProxyJump} ? Pourquoi
+est-il préférable de ne pas exposer directement SSH de la cible au poste utilisateur ?
+À quoi sert la directive \texttt{Banner}, à quel moment son contenu est-il affiché, et
+pourquoi faut-il exécuter \texttt{sshd -t} avant de recharger le service ?
+\begin{solution}
+Le navigateur échange avec l'application web Apache Guacamole. Celle-ci transmet la
+session à \texttt{guacd}, qui devient le client SSH et ouvre la connexion vers la cible.
+La cible voit donc comme origine l'adresse par laquelle le serveur Guacamole atteint son
+réseau, généralement celle du bastion ; aucune connexion SSH directe entre le poste client
+et la cible n'est nécessaire. La commande \texttt{ss} montre l'adresse et le port du pair,
+et le journal SSH permet de les rapprocher de l'authentification observée.
+
+Avec \texttt{ProxyJump}, le client SSH local pilote la connexion et le bastion sert
+principalement de relais réseau. Avec Guacamole, l'utilisateur passe par une interface web
+et le service Guacamole centralise les connexions. Ne pas exposer directement SSH de la
+cible réduit sa surface d'attaque et concentre le contrôle des accès sur le bastion.
+
+La directive \texttt{Banner} demande à \texttt{sshd} d'afficher un avertissement avant
+l'authentification. \texttt{sshd -t} vérifie la syntaxe et les options de la configuration
+avant son rechargement ; cette vérification réduit le risque de rendre le serveur
+inaccessible à cause d'une erreur.
+\end{solution}
 \end{questions}
 
 \section{Tunnels : du forwarding à la demande}
@@ -820,6 +905,10 @@ propres journaux pour rattacher « qui, depuis l'extérieur » à « quelle conn
 Trois mécanismes, un même principe : des flux TCP \emph{embarqués} dans la connexion SSH
 chiffrée. Rappels de topologie : l'hôte ne voit que le bastion (2222) ; le service 8080
 tourne sur la cible.
+
+Un tunnel n'a pas besoin d'être décidé au lancement de la session : on peut aussi
+l'ajouter ou le retirer \emph{à la demande}, sur une connexion déjà ouverte, sans la
+couper (voir la question sur le forwarding à la demande).
 
 \begin{questions}
 \question \textbf{Tunnel local} : depuis l'hôte, ouvrez
@@ -875,22 +964,74 @@ standard pour les bases, l'UI de gestion, l'API interne.
 \question \textbf{Tunnel distant} : sur votre \emph{hôte}, lancez
 \texttt{python3 -m http.server 3000} dans un répertoire contenant un fichier
 \texttt{marqueur.html}. Depuis l'hôte, ouvrez
-\texttt{ssh -R 8080:127.0.0.1:3000 cible}, puis depuis \emph{la cible}
-\texttt{curl 127.0.0.1:8080}. Qui écoute où cette fois ?
+\texttt{ssh -R 8081:127.0.0.1:3000 cible}, puis depuis \emph{la cible}
+\texttt{curl 127.0.0.1:8081}. Qui écoute où cette fois ? (Pourquoi pas le port 8080 ?)
 \begin{solution}
 \begin{bashcode}
 # sur l'hôte :
 mkdir -p /tmp/www && echo "MARQUEUR DEPUIS L'HOTE" > /tmp/www/marqueur.html
 cd /tmp/www && python3 -m http.server 3000 &
-ssh -R 8080:127.0.0.1:3000 cible
+ssh -R 8081:127.0.0.1:3000 cible
 # sur la cible :
-curl 127.0.0.1:8080/marqueur.html
+curl 127.0.0.1:8081/marqueur.html
 # MARQUEUR DEPUIS L'HOTE
 \end{bashcode}
 Symétrique du local : c'est le \textbf{daemon \texttt{sshd} de la cible} qui écoute sur
-\texttt{127.0.0.1:8080} et renvoie le flux vers \texttt{127.0.0.1:3000} \emph{de l'hôte}.
+\texttt{127.0.0.1:8081} et renvoie le flux vers \texttt{127.0.0.1:3000} \emph{de l'hôte}.
+Pourquoi pas 8080 : ce port est déjà pris par le service interne de la question~1. Avec
+\texttt{-R 8080}, \texttt{sshd} n'obtient que \texttt{[::1]:8080} et ssh n'affiche
+\emph{aucune} erreur ; \texttt{curl 127.0.0.1:8080} interroge alors le service de la
+cible, pas le tunnel (vérifiable avec \texttt{ss -ltn} sur la cible). Un écouteur
+\texttt{-R} doit toujours viser un port \emph{libre} sur le serveur.
 Usages typiques : exposer à distance un service qui tourne sur votre poste (Jupyter, un
 dashboard, un outil de debug), ou recevoir le trafic d'un serveur qui ne peut pas sortir.
+\end{solution}
+\question \textbf{Forwarding à la demande} : vous êtes connecté avec un simple
+\texttt{ssh cible} (aucun \texttt{-L}) et vous réalisez que vous avez besoin du service
+8080 de la cible. \emph{Sans quitter la session}, ajoutez le tunnel
+\texttt{18080:127.0.0.1:8080}, testez-le, puis retirez-le. Deux méthodes : la ligne de
+commande d'échappement \texttt{\textasciitilde C} et le multiplexage
+(\texttt{ssh -O forward}). Pourquoi ne pas simplement relancer \texttt{ssh -L} ?
+\begin{solution}
+Méthode 1 : la ligne de commande d'échappement, dans la session interactive.
+\begin{bashcode}
+ssh -o EnableEscapeCommandline=yes cible
+# [Entrée] puis ~C : l'invite « ssh> » apparaît
+ssh> -L 18080:127.0.0.1:8080
+Forwarding port.
+# depuis un autre terminal de l'hôte :
+curl 127.0.0.1:18080
+# retrait à chaud : [Entrée], ~C puis
+ssh> -KL18080
+\end{bashcode}
+Le \texttt{\textasciitilde} n'est interprété qu'\emph{en début de ligne} (juste après
+Entrée) ; \texttt{\textasciitilde ?} liste les séquences disponibles et
+\texttt{\textasciitilde \#} les tunnels actifs. Depuis OpenSSH 9.2, la ligne de commande
+\texttt{\textasciitilde C} est \emph{désactivée par défaut} (message
+\texttt{commandline disabled}) : il faut \texttt{EnableEscapeCommandline yes} dans la
+config ou \texttt{-o} comme ci-dessus.
+
+Méthode 2 : demander au \emph{maître} multiplexé (\texttt{ControlMaster auto} du
+\texttt{Host *}), depuis n'importe quel autre terminal.
+\begin{bashcode}
+ssh cible                      # session ouverte : elle est le maître
+# dans un second terminal :
+ssh -O forward -L 18080:127.0.0.1:8080 cible
+ss -ltnp | grep 18080          # le maître ssh écoute sur 127.0.0.1:18080
+curl 127.0.0.1:18080
+ssh -O cancel -L 18080:127.0.0.1:8080 cible   # retire ce tunnel, le maître reste
+\end{bashcode}
+\texttt{-O forward} accepte aussi \texttt{-R} et \texttt{-D} ; \texttt{-O cancel} avec
+l'option du tunnel ne retire que celui-ci, alors que \texttt{-O exit} arrête le maître.
+La règle de lecture ne change pas : avec \texttt{-L}, \texttt{hote:port} est interprété
+côté \emph{cible}. Si aucun maître n'existe, la commande échoue avec
+\texttt{Control socket ... No such file or directory}.
+
+Relancer \texttt{ssh -L} obligerait à fermer la session en cours (shell, éditeur, commande
+longue perdus) et à se ré-authentifier à travers le bastion. Différence de durée de vie :
+un tunnel ajouté par \texttt{\textasciitilde C} disparaît avec la session, alors qu'un
+tunnel ajouté par \texttt{-O forward} appartient au maître et survit tant que celui-ci
+vit (\texttt{ControlPersist 10m}).
 \end{solution}
 \question Côté serveur, quelles options \texttt{sshd\_config} gouvernent ces tunnels
 (\texttt{AllowTcpForwarding}, \texttt{GatewayPorts}) ? Que bloque
@@ -898,17 +1039,18 @@ dashboard, un outil de debug), ou recevoir le trafic d'un serveur qui ne peut pa
 être configuré ainsi ?
 \begin{solution}
 \begin{itemize}
-  \item \texttt{AllowTcpForwarding yes} (défaut) : autorise les tunnels \emph{locaux}
-        (\texttt{-L}) depuis les clients.
-  \item \texttt{AllowTcpForwarding no} : refuse les tunnels \texttt{-R} \emph{demandés
-        par le client distant} (le client local \texttt{-L} est quand même possible ;
-        c'est \texttt{PermitTunnel} et les règles \texttt{Match} qui affinent).
+  \item \texttt{AllowTcpForwarding yes} (défaut) : autorise \emph{tous} les tunnels
+        (\texttt{-L}, \texttt{-R}, \texttt{-D}). Valeurs : \texttt{yes} (ou \texttt{all}),
+        \texttt{local} (\texttt{-L} seul), \texttt{remote} (\texttt{-R} seul), \texttt{no}.
+  \item \texttt{AllowTcpForwarding no} : refuse \emph{toutes} les redirections TCP,
+        \texttt{-L} compris, et aussi \texttt{ProxyJump} (qui repose sur \texttt{-W}).
         Sur un bastion « kiosque » (accès shell only, pas de tunnel),
         \texttt{AllowTcpForwarding no} empêche d'utiliser le bastion comme relais pour
         contourner le réseau.
   \item \texttt{GatewayPorts no} (défaut) : les écouteurs \texttt{-R} ne se bindent que sur
-        la boucle de la machine distante. \texttt{GatewayPorts clients/all} autoriserait
-        le bind sur d'autres interfaces : à réserver à des cas très encadrés.
+        la boucle de la machine distante. \texttt{GatewayPorts yes} ou
+        \texttt{clientspecified} autoriserait le bind sur d'autres interfaces : à réserver
+        à des cas très encadrés.
 \end{itemize}
 \end{solution}
 \question \textbf{Tunnel dynamique} : ouvrez \texttt{ssh -N -D 1080 cible} puis depuis
@@ -1022,11 +1164,19 @@ Le tunnel est-il encore là ? Pourquoi le combo \texttt{ControlPersist} + \textt
 le bon réflexe ?
 \begin{solution}
 \begin{bashcode}
-ssh -fN -L 18080:127.0.0.1:8080 cible
+ssh -o ExitOnForwardFailure=yes -fN -L 18080:127.0.0.1:8080 cible
 # ... fermeture du terminal ...
-curl 127.0.0.1:18080     # toujours servable
-ssh -O check cible       # Master running (pid=...)
+ss -ltnp | grep ':18080' # écouteur local présent
+curl 127.0.0.1:18080    # teste le service au bout du tunnel
+ssh -O check cible      # vérifie le maître SSH, pas le tunnel
 \end{bashcode}
+\texttt{ExitOnForwardFailure yes} fait échouer la commande si le transfert demandé ne peut
+pas être établi (par exemple si le port local est déjà occupé). Avec \texttt{-f}, SSH attend
+que le transfert soit établi avant de passer en arrière-plan. \texttt{ss} vérifie que le port
+local écoute ; \texttt{ssh -O check} confirme seulement que le maître SSH tourne. Seul
+\texttt{curl} vérifie aussi l'accès au service distant : l'option ne détecte pas une panne du
+service derrière un tunnel déjà établi.
+
 Sans \texttt{ControlPersist}, le maître meurt quand le dernier client se déconnecte : le
 tunnel \texttt{-fN} mourrait avec votre terminal. Avec
 \texttt{ControlPersist 10m}, le maître survit 10~minutes après la dernière déconnexion
@@ -1316,6 +1466,7 @@ Host lab
 \texttt{-L port:hôte:port} & tunnel local (hôte résolu \emph{du côté serveur}) \\
 \texttt{-R port:hôte:port} & tunnel distant (écouteur \emph{sur} le serveur) \\
 \texttt{-D port} & proxy SOCKS5 dynamique \\
+\texttt{\textasciitilde C} puis \texttt{-L ...} / \texttt{ssh -O forward -L ...} & ajoute un tunnel à chaud, sans relancer la session \\
 \texttt{ssh -G hôte} & affiche la config résolue (debug) \\
 \texttt{ssh -O check|cancel} & état / arrêt du maître multiplexé \\
 \texttt{ControlMaster auto} & multiplexage sur socket UNIX \\
@@ -1344,5 +1495,220 @@ Host lab
   \item l'option \texttt{PermitTunnel} de \texttt{sshd\_config} (tunnel TAP, pour du
         véritable VPN sur SSH) — à connaître, rarement à utiliser.
 \end{itemize}
+
+\section{Hardening SSH}\label{hardening-ssh}
+
+Pour chacune des questions, indiquer les fichiers modifiés, les
+configurations et commandes réalisées. Ne pas hésiter à utiliser
+\texttt{man\ sshd\_config} et \texttt{man\ ssh }, et fournir des captures d'écran.
+
+\begin{questions}
+\question Modifier le port d'écoute de SSH du bastion sur 20222, puis tester la
+  connexion depuis votre hôte. Quel est l'avantage de cette manipulation
+  si la machine est exposée sur internet (en DMZ par exemple) ? Quelle
+  en est la limite ?
+
+\begin{solution}
+\emph{Changer le port permet de réduire le bruit des bots qui
+scannent massivement le port 22 sur internet. L'avantage
+principal, c'est qu'il y aura moins de
+tentatives de connexion donc moins de logs liés au flood. La mesure ne
+protège pas du bruteforce par exemple. En complément, il est possible
+d'autoriser uniquement l'authentification par clé ou un
+mécanisme comme Fail2ban.}
+
+Modifications à réaliser :
+
+\begin{bashcode}
+sudo -i
+nano /etc/ssh/sshd_config
+\end{bashcode}
+
+Remplacer :
+
+\begin{bashcode}
+# Port 22
+Port 20222
+\end{bashcode}
+
+Puis :
+
+\begin{bashcode}
+sudo -i
+systemctl reload ssh
+\end{bashcode}
+
+Depuis votre hôte, modifier l'alias du bastion :
+
+\begin{bashcode}
+  Host bastion
+      HostName 10.99.0.10
+      Port 20222
+\end{bashcode}
+
+Tester la connexion :
+
+\begin{bashcode}
+ssh bastion
+\end{bashcode}
+
+\end{solution}
+
+\question Modifier le fichier de configuration du démon SSH pour
+  n'autoriser la connexion qu'aux
+  utilisateurs "test" et "test2". Quelle serait la démarche pour refuser
+  la connexion à un groupe ?
+
+
+
+\begin{solution}
+Afin d'autoriser la connexion qu'à
+l'utilisateur "test" et "test2", il faut ajouter la
+configuration suivante dans le fichier \texttt{/etc/ssh/sshd\_config} :
+
+\begin{bashcode}
+AllowUsers test test2
+\end{bashcode}
+
+Pour refuser un groupe, la directive est :
+
+\begin{bashcode}
+DenyGroups grp-exemple
+\end{bashcode}
+
+Puis :
+
+\begin{bashcode}
+systemctl reload ssh
+\end{bashcode}
+
+\end{solution}
+
+\question Que se passe-t-il si les directives AllowUsers et AllowGroups
+  coexistent dans le fichier de configuration sshd ? (Réaliser la
+  manipulation en créant le groupe "grp-adm" et
+  l'utilisateur "test2")
+
+\begin{solution}
+Si les deux directives coexistent,
+
+\begin{bashcode}
+sudo -i
+adduser test2
+groupadd grp-adm
+usermod -aG grp-adm test2
+\end{bashcode}
+
+Modifier le fichier de configuration \texttt{/etc/ssh/sshd\_config} et
+ajouter :
+
+\begin{bashcode}
+AllowGroups grp-adm
+\end{bashcode}
+
+Depuis une autre machine, tester avec les deux utilisateurs la connexion
+:
+
+\begin{bashcode}
+ssh -p 20222 test@10.99.0.10 # refusée
+\end{bashcode}
+
+\begin{bashcode}
+ssh -p 20222 test2@10.99.0.10 # ok
+\end{bashcode}
+
+\end{solution}
+
+\question Générer une paire de clés SSH ed25519 pour
+  l'utilisateur test2 et ajouter la clé SSH publique de
+  test2 au bastion (\texttt{ssh-copy-id}). Modifier la configuration du
+  démon SSH pour n'autoriser que
+  l'authentification par clé et refuser
+  l'authentification sur l'utilisateur
+  root.
+
+\begin{solution}
+\begin{bashcode}
+ssh-keygen -t ed25519 -C "test2@poste" -f ~/.ssh/id_ed25519_test2
+ssh-copy-id -i ~/.ssh/id_ed25519_test2.pub -p 20222 test2@10.99.0.10
+\end{bashcode}
+
+Modifier le fichier de configuration :
+
+\begin{bashcode}
+sudo -i
+nano /etc/ssh/sshd_config
+\end{bashcode}
+
+Ajouter ces directives :
+
+\begin{bashcode}
+PasswordAuthentication no
+PermitRootLogin no
+\end{bashcode}
+
+Puis : 
+
+\begin{bashcode}
+sudo systemctl reload ssh
+\end{bashcode}
+
+En bonus, il est possible de désactiver
+l'authentification interactive :
+
+\begin{bashcode}
+KbdInteractiveAuthentication no
+\end{bashcode}
+\end{solution}
+
+\question \emph{Un bastion ne doit pas permettre la connexion à
+n'importe quelle machine.
+L'administrateur système doit choisir quel groupe
+d'utilisateurs peut accéder à quelle machine.}
+
+  Limiter l'accès aux machines \texttt{10.99.0.110} et
+  \texttt{10.99.0.111} pour tous les utilisateurs du groupe
+  "grp-rebond" (Créer le groupe si nécessaire)
+
+\begin{solution}
+Modifier le fichier de configuration :
+
+\begin{bashcode}
+sudo -i
+groupadd grp-rebond
+usermod -aG grp-rebond test2
+\end{bashcode}
+
+\begin{bashcode}
+Match Group grp-rebond
+    AllowTcpForwarding local
+    PermitOpen 10.99.0.110:22 10.99.0.111:22
+\end{bashcode}
+
+Depuis votre hôte, modifier l'alias du bastion :
+
+\begin{bashcode}
+  Host bastion
+      HostName 10.99.0.10
+      Port 20222
+      User test2
+      IdentityFile ~/.ssh/id_ed25519_test2
+\end{bashcode}
+
+Puis :
+
+\begin{bashcode}
+systemctl reload ssh
+\end{bashcode}
+
+Résultat :
+
+\begin{bashcode}
+ssh -J bastion test2@10.99.0.110   # ok
+ssh -J bastion test2@10.99.0.11 # refusée
+\end{bashcode}
+\end{solution}
+\end{questions}
+
 
 \end{document}
